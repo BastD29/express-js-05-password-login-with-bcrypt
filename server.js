@@ -1,41 +1,49 @@
 // const express = require("express");
 import express from "express";
 
-// const { users } = require("./data");
-// import users from "./data.js";
-import { ROLE, users } from "./data.js";
-
-// const projectRouter = require("./routes/projects");
-import projectRouter from "./routes/projects.js";
-
-import { authRole, authUser } from "./basicAuth.js";
+// const bcrypt = require("bcrypt");
+import bcrypt from "bcrypt";
 
 const app = express();
 
-// console.log("users:", users);
-
 app.use(express.json());
-app.use(setUser);
-app.use("/projects", projectRouter);
 
-app.get("/", (req, res) => {
-  res.send("Home Page");
+const users = [];
+
+app.get("/users", (req, res) => {
+  res.json(users);
 });
 
-app.get("/dashboard", authUser, (req, res) => {
-  res.send("Dashboard Page");
-});
-
-app.get("/admin", authUser, authRole(ROLE.ADMIN), (req, res) => {
-  res.send("Admin Page");
-});
-
-function setUser(req, res, next) {
-  const userId = req.body.userId;
-  if (userId) {
-    req.user = users.find((user) => user.id === userId);
+app.post("/users", async (req, res) => {
+  try {
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    // const hashedPassword = await bcrypt.hash(req.body.password, salt);
+    console.log("salt:", salt); // ex: salt: $2b$10$0/ac/l0Fwyus4z7JwGfl4.
+    console.log("hashedPassword:", hashedPassword); // ex: hashedPassword: $2b$10$0/ac/l0Fwyus4z7JwGfl4.gmq6B2diwLj.cC7qscYucHqVGlkgoBW
+    const user = { name: req.body.name, password: hashedPassword };
+    // const user = { name: req.body.name, password: req.body.password };
+    users.push(user);
+    res.status(201).send();
+  } catch {
+    res.status(500).send();
   }
-  next();
-}
+});
+
+app.post("/users/login", async (req, res) => {
+  const user = users.find((user) => user.name === req.body.name);
+  if (user == null) {
+    return res.status(400).send("Cannot find user");
+  }
+  try {
+    if (await bcrypt.compare(req.body.password, user.password)) {
+      res.send("Success");
+    } else {
+      res.send("Not Allowed");
+    }
+  } catch {
+    res.status(500).send();
+  }
+});
 
 app.listen(3000);
